@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
+import FolderBoard from "@/app/components/FolderBoard";
 
 const allowedDomain = "activezoneoutdoor.cy";
 
@@ -108,17 +109,9 @@ export default function Home() {
       <section className="welcome">
         <p className="eyebrow">AZO STUDIO · YOUR WORKSPACE</p>
         <h1>Good to have you here{firstName ? `, ${firstName}` : ""}.</h1>
-        <p>Manage contributor albums from Google Drive and Google Photos, then curate the public Active Zone Outdoor gallery.</p>
+        <p>Publish activity folders from Google Drive as Google Photos albums.</p>
       </section>
-      <section className="album-section">
-        <div className="section-heading"><div><p className="eyebrow">ALBUM WORKFLOW</p><h2>Manage your sources</h2></div><span className="coming-label">AZO STUDIO</span></div>
-        <p className="source-intro">Photos stay in Google. AZO Studio will organize the albums people contribute and control which collections appear in the public gallery.</p>
-        <div className="source-grid">
-          <article className="source-card"><div className="source-icon drive-icon">D</div><div className="source-copy"><p className="eyebrow">CONTRIBUTOR LIBRARY</p><h3>Google Drive</h3><p>Review shared folders and albums contributed by the team.</p></div><span className="soon">CONNECT SOON</span></article>
-          <article className="source-card"><div className="source-icon photos-icon">◉</div><div className="source-copy"><p className="eyebrow">CURATED COLLECTIONS</p><h3>Google Photos</h3><p>Choose the albums to feature in the public gallery.</p></div><span className="soon">CONNECT SOON</span></article>
-        </div>
-        <div className="public-gallery-note"><span className="gallery-dot"></span><div><p className="eyebrow">PUBLIC VIEW</p><strong>Active Zone Outdoor photo albums</strong><p>Published albums will appear here for everyone to browse.</p></div><span className="soon">NOT CONNECTED</span></div>
-      </section>
+      <FolderBoard supabase={supabase!} />
       <footer className="workspace-footer"><span>ACTIVE ZONE OUTDOOR</span><span>MADE FOR THE OUTDOORS <b>↗</b></span></footer>
     </main>
   );

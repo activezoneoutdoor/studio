@@ -1,0 +1,6 @@
+project_id = "azo-studio"
+
+# Google redirects the browser to this callback without a Supabase session;
+# it is protected by the signed OAuth state instead.
+[functions.google-oauth]
+verify_jwt = false

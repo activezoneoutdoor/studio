@@ -1,6 +1,14 @@
 # AZO Studio | Active Zone Outdoor
 
-AZO Studio manages contributed photo albums from Google Drive and Google Photos, and curates the albums shown in the public Active Zone Outdoor gallery. Photos remain in Google; this app does not host or upload image files. The static app can be hosted on GitHub Pages, with Supabase Auth handling Google sign-in and sessions.
+AZO Studio publishes activity folders from Google Drive as Google Photos albums. Operators sign in with an `@activezoneoutdoor.cy` Google Workspace account and see every sub-folder of the shared Drive folder in one of three lists:
+
+- **Pending**: the folder has photos or videos waiting to be published.
+- **Upcoming**: a new activity folder with no media and no album yet.
+- **Done**: no media left, and its album exists.
+
+For a pending folder the operator can edit its name (this renames the Drive folder, and the album if one exists) or transfer it. A transfer runs as `photos@activezoneoutdoor.cy`. It finds or creates the Google Photos album with the folder's name and uploads only files that are not already in that album. Each file moves to the Drive trash once it is in Google Photos. Every item is logged in the **AZO Studio transfer log** Google Sheet. Its *Summary* tab shows the last job and the last item transferred, and its *Items* tab has one row per file.
+
+The static app is hosted on GitHub Pages. Supabase Auth handles sign-in, and Supabase Edge Functions (`supabase/functions`) do the Google work, so the photos@ account's token never reaches the browser.
 
 ## Supabase setup
 
@@ -12,6 +20,50 @@ AZO Studio manages contributed photo albums from Google Drive and Google Photos,
 4. Copy `.env.example` to `.env.local` for local development and fill in the Supabase project URL and publishable/anon key. These browser values are public by design; never use a service-role key here.
 
 5. Run `supabase/migrations/20260927000000_restrict_workspace_signups.sql` in the Supabase SQL Editor. Then enable **Authentication → Hooks → Before User Created** and select `public.enforce_azo_workspace_signup`. This hook rejects account creation unless the account is a Google identity with the approved domain.
+
+## Google Drive → Photos transfer setup
+
+### Limits to know
+
+- **Google Photos only shows albums this app created.** Since March 2025, the Photos Library API cannot list or add to albums made by hand in the Photos app. An album made by hand with the same name is not reused; AZO Studio creates its own album.
+- **The Drive folder must be in a Shared Drive**, and `photos@activezoneoutdoor.cy` needs the **Content manager** role there. In My Drive only a file's owner can trash it, so files uploaded by other people could not be removed.
+- Unsupported files (for example PSD or SVG) are skipped. Files that fail stay in Drive and show as failed in the log.
+
+### Google Cloud
+
+1. In the Google Cloud project that has the OAuth client, enable **Google Drive API**, **Photos Library API** and **Google Sheets API**.
+2. Set the OAuth consent screen's user type to **Internal**. Workspace-internal apps can use the Drive and Photos scopes without Google verification.
+3. Add `https://<project-ref>.supabase.co/functions/v1/google-oauth` to the OAuth client's **Authorized redirect URIs**. You can reuse the client Supabase uses for sign-in or create a separate one.
+
+### Supabase
+
+```bash
+supabase link --project-ref <project-ref>
+supabase db push          # applies supabase/migrations (transfer tables and policies)
+supabase secrets set \
+  GOOGLE_CLIENT_ID=... \
+  GOOGLE_CLIENT_SECRET=... \
+  OAUTH_STATE_SECRET=$(openssl rand -hex 32) \
+  APP_URL=https://studio.activezoneoutdoor.cy/ \
+  DRIVE_ROOT_FOLDER_ID=1Y1OgT8bnbp4FBadUJH4erIrLGfVVldVN \
+  PHOTOS_ACCOUNT_EMAIL=photos@activezoneoutdoor.cy
+supabase functions deploy studio-api
+supabase functions deploy google-oauth --no-verify-jwt
+```
+
+Optional secrets:
+- `LOG_SPREADSHEET_ID` uses an existing Sheet instead of creating one in the Drive folder. The Sheet needs *Summary* and *Items* tabs.
+- `CHUNK_BYTES` sets the upload chunk size. The default is 32 MB.
+
+### Connect the photos account (once)
+
+Sign in to AZO Studio and click **Connect**. On the Google screen, choose `photos@activezoneoutdoor.cy` and allow every permission. The callback only accepts that account. Its refresh token is stored in the `google_connection` table, which only the service role can read. Use **Reconnect** if access is ever revoked.
+
+### How a transfer runs
+
+Edge Functions have short time limits, so the browser drives the job one step at a time. Each `transfer-step` call handles one file, or one 32 MB chunk of a large video, using a resumable Google Photos upload. Progress is stored in `transfer_jobs` / `transfer_items`. If the tab closes, the folder shows **Resume** and continues where it stopped. Files already published are recognised by Drive file id or MD5 checksum and are not uploaded again.
+
+Unit tests for the rules: `deno test supabase/functions/_shared`.
 
 ## Run locally
 
