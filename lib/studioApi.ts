@@ -26,6 +26,7 @@ export interface YearFolder {
 export interface Folder {
   id: string;
   name: string;
+  nameIssues: string[];
   url: string;
   createdTime: string;
   mediaCount: number;
@@ -40,6 +41,7 @@ export interface StudioStatus {
   expectedEmail: string;
   rootFolderUrl: string;
   logSheetUrl: string | null;
+  canTransfer: boolean;
   lastJob: TransferJob | null;
 }
 

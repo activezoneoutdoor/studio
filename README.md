@@ -21,6 +21,22 @@ The static app is hosted on GitHub Pages. Supabase Auth handles sign-in, and Sup
 
 5. Run `supabase/migrations/20260927000000_restrict_workspace_signups.sql` in the Supabase SQL Editor. Then enable **Authentication → Hooks → Before User Created** and select `public.enforce_azo_workspace_signup`. This hook rejects account creation unless the account is a Google identity with the approved domain.
 
+### Activity folder names
+
+Activity folders are named `<date> <Name>`:
+
+- The date is `YYYYMMDD`, `YYYYMMDD-DD`, `YYYYMMDD-MMDD` or `YYYYMMDD-YYYYMMDD`. It must be a real date and fall in the year folder's year.
+- The date is followed by a single space, never `-`.
+- The name is CamelCase words: each starts with a capital letter and contains only letters and digits.
+
+Examples: `20260315 Troodos Hike`, `20260315-16 Troodos Hike`, `20261230-20270102 NewYear Trip`.
+
+Folders that break these rules are flagged with **Check name** and the list of problems. The flag is only a warning and does not block a transfer. **Edit name** shows live feedback while the operator types.
+
+### Who can run transfers
+
+Every workspace operator can view folders and rename them. Only accounts in the `TRANSFER_EMAILS` secret can start, resume or stop transfers. This is a comma-separated list, and it defaults to `achernar@activezoneoutdoor.cy`. The server enforces it.
+
 ## Google Drive → Photos transfer setup
 
 ### Limits to know

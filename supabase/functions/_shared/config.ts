@@ -14,6 +14,10 @@ export const config = {
   get appUrl() { return env("APP_URL", "https://studio.activezoneoutdoor.cy/"); },
   get supabaseUrl() { return env("SUPABASE_URL"); },
   get serviceRoleKey() { return env("SUPABASE_SERVICE_ROLE_KEY"); },
+  // Only these accounts may run transfer jobs (comma-separated).
+  get transferEmails() {
+    return env("TRANSFER_EMAILS", "achernar@activezoneoutdoor.cy").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  },
   get stateSecret() { return env("OAUTH_STATE_SECRET"); },
   // Bytes sent to Google Photos per transfer-step call. Kept a multiple of 256 KiB.
   get chunkBytes() {

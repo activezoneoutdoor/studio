@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { folderNameIssues } from "@/supabase/functions/_shared/folderName";
 import { studioApi, type Folder, type FolderStatus, type StepResult, type StudioStatus, type YearFolder } from "@/lib/studioApi";
 
 const tabs: { key: FolderStatus; label: string; empty: string }[] = [
@@ -63,6 +64,8 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
     }
   }, [supabase]);
 
+  const yearName = years?.find((y) => y.id === yearId)?.name;
+
   function chooseYear(id: string) {
     if (id === yearId) return;
     setFolders(null);
@@ -95,7 +98,7 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
     try {
       const { name } = await studioApi.rename(supabase, folder.id, editing.value);
       setFolders((list) => list?.map((f) => f.id === folder.id
-        ? { ...f, name, album: f.album && { ...f.album, title: name } }
+        ? { ...f, name, nameIssues: folderNameIssues(name, yearName), album: f.album && { ...f.album, title: name } }
         : f) ?? null);
       setEditing(null);
       setNotice(`Renamed to “${name}”.`);
@@ -149,6 +152,7 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
   const counts = Object.fromEntries(tabs.map((t) => [t.key, folders?.filter((f) => f.status === t.key).length ?? 0]));
   const visible = folders?.filter((f) => f.status === tab) ?? [];
   const busy = !!progress;
+  const flagged = folders?.filter((f) => f.nameIssues.length).length ?? 0;
 
   return (
     <section className="album-section">
@@ -196,6 +200,9 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
             ))}
           </div>
 
+          {!status.canTransfer && <p className="board-hint">Transfers are limited to approved accounts for now. You can still review folders and fix names.</p>}
+          {flagged > 0 && <p className="board-hint warn">{flagged} folder{flagged === 1 ? "" : "s"} in {yearName} {flagged === 1 ? "does" : "do"} not follow the naming convention <code>YYYYMMDD[-DD|-MMDD|-YYYYMMDD] CamelCaseName</code>.</p>}
+
           {!folders && loading && <p className="board-empty">Reading the Drive folder…</p>}
           {folders && !visible.length && <p className="board-empty">{tabs.find((t) => t.key === tab)?.empty}</p>}
 
@@ -207,7 +214,7 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
               const current = running?.result?.current;
               const handled = job ? job.items_done + job.items_skipped + job.items_failed : 0;
               return (
-                <li key={folder.id} className="folder-row">
+                <li key={folder.id} className={folder.nameIssues.length ? "folder-row flagged" : "folder-row"}>
                   <div className="folder-main">
                     {isEditing ? (
                       <form className="rename-form" onSubmit={(e) => { e.preventDefault(); void saveName(folder); }}>
@@ -215,9 +222,16 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
                           onChange={(e) => setEditing({ ...editing, value: e.target.value })} disabled={editing.saving} />
                         <button className="primary-button" disabled={editing.saving || !editing.value.trim()}>Save</button>
                         <button type="button" className="text-button" onClick={() => setEditing(null)} disabled={editing.saving}>Cancel</button>
+                        <NameIssues issues={folderNameIssues(editing.value, yearName)} okText="Name follows the convention." />
                       </form>
                     ) : (
-                      <h3><a href={folder.url} target="_blank" rel="noreferrer">{folder.name}</a></h3>
+                      <>
+                        <h3>
+                          <a href={folder.url} target="_blank" rel="noreferrer">{folder.name}</a>
+                          {folder.nameIssues.length > 0 && <span className="name-flag" title={folder.nameIssues.join("\n")}>Check name</span>}
+                        </h3>
+                        <NameIssues issues={folder.nameIssues} />
+                      </>
                     )}
                     <p>
                       {folder.status === "pending" && `${folder.mediaCount} photo${folder.mediaCount === 1 ? "" : "s"}/video${folder.mediaCount === 1 ? "" : "s"} to publish`}
@@ -250,10 +264,10 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
                       <button className="text-button" onClick={() => { stopRequested.current = true; }}>Stop</button>
                     ) : !isEditing && confirming !== folder.id && (
                       <>
-                        {folder.status !== "done" && (
+                        {(folder.status !== "done" || folder.nameIssues.length > 0) && (
                           <button className="text-button" disabled={busy} onClick={() => setEditing({ id: folder.id, value: folder.name })}>Edit name</button>
                         )}
-                        {folder.status === "pending" && (folder.runningJob
+                        {folder.status === "pending" && status.canTransfer && (folder.runningJob
                           ? <button className="primary-button" disabled={busy} onClick={() => void runJob(folder.id, folder.runningJob!.id)}>Resume</button>
                           : <button className="primary-button" disabled={busy} onClick={() => setConfirming(folder.id)}>Transfer</button>)}
                       </>
@@ -267,4 +281,9 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
       )}
     </section>
   );
+}
+
+function NameIssues({ issues, okText }: { issues: string[]; okText?: string }) {
+  if (!issues.length) return okText ? <p className="name-ok">{okText}</p> : null;
+  return <ul className="name-issues">{issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>;
 }
