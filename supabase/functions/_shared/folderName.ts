@@ -2,7 +2,11 @@
 //
 //   <date> <Title>
 //   date:  YYYYMMDD | YYYYMMDD-DD | YYYYMMDD-MMDD | YYYYMMDD-YYYYMMDD
-//   title: CamelCase words separated by single spaces, e.g. "20260315-16 Troodos Hike"
+//   title: CamelCase words separated by single spaces, e.g. "20260315-16 Troodos Hike";
+//          "the", "in", "at" and "&" may appear after the first word, e.g. "20260315 Sunset at the Lake"
+
+// Lowercase connector words allowed between CamelCase words (not as the first word).
+const connectors = new Set(["the", "in", "at", "&"]);
 
 const datePattern = /^(\d{8})(?:-(\d{2}|\d{4}|\d{8}))?(?=\s|-|$)/;
 
@@ -47,9 +51,14 @@ export function folderNameIssues(rawName: string, year?: string): string[] {
   const title = rest.replace(/^[\s-]+/, "");
   if (/\s{2,}/.test(rest.trimStart()) || rest.startsWith("  ")) issues.push("Use single spaces between words.");
   if (title.includes("-")) issues.push("Do not use “-” in the activity name.");
-  const badWords = title.split(/[\s-]+/).filter((w) => w && !/^[\p{Lu}\d][\p{L}\d]*$/u.test(w));
+  const words = title.split(/[\s-]+/).filter(Boolean);
+  const badWords = words.filter((w, i) => !/^[\p{Lu}\d][\p{L}\d]*$/u.test(w) && !(i > 0 && connectors.has(w)));
   if (badWords.length) {
-    issues.push(`Write words in CamelCase (capital first letter, letters and digits only): ${badWords.map((w) => `“${w}”`).join(", ")}.`);
+    issues.push(
+      `Write words in CamelCase (capital first letter, letters and digits only; “the”, “in”, “at” and “&” are allowed after the first word): ${
+        badWords.map((w) => `“${w}”`).join(", ")
+      }.`,
+    );
   }
   return issues;
 }

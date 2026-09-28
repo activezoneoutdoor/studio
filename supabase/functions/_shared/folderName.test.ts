@@ -9,6 +9,9 @@ Deno.test("accepts every date form", () => {
     "20261230-20270102 NewYear Trip",
     "20260315 TroodosHike",
     "20260315 Akamas 4x4 Tour",
+    "20260315 Sunset at the Lake",
+    "20260315 Climbing in Troodos",
+    "20260315 Kayak & Snorkel",
   ]) assertEquals(folderNameIssues(name, "2026"), [], name);
 });
 
@@ -21,6 +24,9 @@ Deno.test("flags names that break the convention", () => {
   has("20260315 - Troodos Hike", "single space");
   has("20260315 Troodos-Hike", "Do not use “-”");
   has("20260315 troodos hike", "CamelCase");
+  has("20260315 the Lake", "CamelCase");
+  has("20260315 Sunset on the Lake", "“on”");
+  has("20260315 Kayak and Snorkel", "“and”");
   has("20260315  Troodos", "single spaces");
   has("20260231 Troodos", "not a real date");
   has("20260315-14 Troodos", "before the start");
