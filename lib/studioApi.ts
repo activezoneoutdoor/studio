@@ -47,10 +47,23 @@ export interface StepResult {
 async function call<T>(supabase: SupabaseClient, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke("studio-api", { body });
   if (error) {
-    // FunctionsHttpError carries the JSON body with our message.
-    const context = (error as { context?: Response }).context;
-    const message = context ? await context.json().then((b) => b.error).catch(() => null) : null;
-    throw new Error(message ?? error.message);
+    console.error("studio-api call failed", body.action, error);
+    // Only FunctionsHttpError carries a Response; FunctionsFetchError carries the network error.
+    const context: unknown = (error as { context?: unknown }).context;
+    if (error.name === "FunctionsHttpError" && context instanceof Response) {
+      let message: string | null = null;
+      try {
+        message = (await context.json())?.error ?? null;
+      } catch { /* body was not JSON */ }
+      throw new Error(message ?? `The AZO Studio server returned HTTP ${context.status}.`);
+    }
+    if (error.name === "FunctionsFetchError") {
+      throw new Error("Could not reach the AZO Studio server (Edge Function studio-api). Check that it is deployed to this Supabase project.");
+    }
+    if (error.name === "FunctionsRelayError") {
+      throw new Error("Supabase could not run the studio-api function. Try again.");
+    }
+    throw new Error(error.message);
   }
   return data as T;
 }

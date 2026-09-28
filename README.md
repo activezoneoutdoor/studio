@@ -55,6 +55,12 @@ Optional secrets:
 - `LOG_SPREADSHEET_ID` uses an existing Sheet instead of creating one in the Drive folder. The Sheet needs *Summary* and *Items* tabs.
 - `CHUNK_BYTES` sets the upload chunk size. The default is 32 MB.
 
+**Troubleshooting:** the app may show *"Could not reach the AZO Studio server (Edge Function studio-api)"*. If so, the browser cannot reach the function. Check the following:
+
+1. Run `supabase functions deploy studio-api` and `supabase functions deploy google-oauth --no-verify-jwt` against the same project as `NEXT_PUBLIC_SUPABASE_URL`.
+2. Run `supabase secrets list` to confirm the secrets above are set.
+3. Look for boot errors under **Dashboard → Edge Functions → studio-api → Logs**.
+
 ### Connect the photos account (once)
 
 Sign in to AZO Studio and click **Connect**. On the Google screen, choose `photos@activezoneoutdoor.cy` and allow every permission. The callback only accepts that account. Its refresh token is stored in the `google_connection` table, which only the service role can read. Use **Reconnect** if access is ever revoked.
