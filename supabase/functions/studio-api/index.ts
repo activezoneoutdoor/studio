@@ -9,9 +9,9 @@ import { getConnection, mapLimit } from "../_shared/google.ts";
 import { corsHeaders, errorResponse, HttpError, json } from "../_shared/http.ts";
 import { consentUrl } from "../_shared/oauth.ts";
 import { listAppAlbums } from "../_shared/photos.ts";
-import { classifyFolder } from "../_shared/rules.ts";
+import { classifyFolder, sortYearFolders } from "../_shared/rules.ts";
 import { logSheetUrl } from "../_shared/sheets.ts";
-import { cancelTransfer, renameManagedFolder, startTransfer, stepTransfer } from "../_shared/transfer.ts";
+import { cancelTransfer, renameManagedFolder, requireYearFolder, startTransfer, stepTransfer } from "../_shared/transfer.ts";
 
 const db = () => adminClient();
 
@@ -37,9 +37,14 @@ interface AlbumRow {
   last_transfer_at: string | null;
 }
 
-async function folders() {
+async function years() {
+  return sortYearFolders(await listFolders(config.driveRootFolderId)).map((f) => ({ id: f.id, name: f.name.trim() }));
+}
+
+async function folders(yearId: unknown) {
+  const year = await requireYearFolder(yearId);
   const [driveFolders, albumsResult, jobsResult] = await Promise.all([
-    listFolders(config.driveRootFolderId),
+    listFolders(year.id),
     db().from("photo_albums").select("drive_folder_id, album_id, title, product_url, last_transfer_at"),
     db().from("transfer_jobs").select("*").eq("status", "running"),
   ]);
@@ -90,8 +95,10 @@ Deno.serve(async (req) => {
         return json(await status());
       case "connect-url":
         return json({ url: await consentUrl(operator.email) });
+      case "years":
+        return json({ years: await years() });
       case "folders":
-        return json({ folders: await folders() });
+        return json({ folders: await folders(body.yearId) });
       case "rename":
         return json({ name: await renameManagedFolder(body.folderId, body.name) });
       case "transfer-start":

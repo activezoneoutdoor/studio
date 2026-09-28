@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { studioApi, type Folder, type FolderStatus, type StepResult, type StudioStatus } from "@/lib/studioApi";
+import { studioApi, type Folder, type FolderStatus, type StepResult, type StudioStatus, type YearFolder } from "@/lib/studioApi";
 
 const tabs: { key: FolderStatus; label: string; empty: string }[] = [
   { key: "pending", label: "Pending", empty: "No folders are waiting to be published." },
@@ -36,20 +36,40 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
   const [editing, setEditing] = useState<{ id: string; value: string; saving?: boolean } | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [years, setYears] = useState<YearFolder[] | null>(null);
+  const [yearId, setYearId] = useState<string | null>(null);
+  const selectedYear = useRef<string | null>(null);
   const stopRequested = useRef(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (nextYearId?: string) => {
     setLoading(true);
     try {
       const nextStatus = await studioApi.status(supabase);
       setStatus(nextStatus);
-      if (nextStatus.connected) setFolders((await studioApi.folders(supabase)).folders);
+      if (!nextStatus.connected) return;
+      const { years: yearList } = await studioApi.years(supabase);
+      setYears(yearList);
+      const currentYear = String(new Date().getFullYear());
+      const chosen = yearList.find((y) => y.id === (nextYearId ?? selectedYear.current))
+        ?? yearList.find((y) => y.name === currentYear)
+        ?? yearList[0];
+      selectedYear.current = chosen?.id ?? null;
+      setYearId(selectedYear.current);
+      setFolders(chosen ? (await studioApi.folders(supabase, chosen.id)).folders : []);
     } catch (err) {
       setNotice((err as Error).message);
     } finally {
       setLoading(false);
     }
   }, [supabase]);
+
+  function chooseYear(id: string) {
+    if (id === yearId) return;
+    setFolders(null);
+    setEditing(null);
+    setConfirming(null);
+    void load(id);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -137,7 +157,7 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
         <button className="text-button" onClick={() => void load()} disabled={loading || busy}>{loading ? "Refreshing…" : "Refresh"}</button>
       </div>
       <p className="source-intro">
-        Each folder in the <a href={status?.rootFolderUrl} target="_blank" rel="noreferrer">shared Drive folder</a> becomes a Google Photos album
+        Each activity folder inside a year folder (2026, 2025…) of the <a href={status?.rootFolderUrl} target="_blank" rel="noreferrer">shared Drive folder</a> becomes a Google Photos album
         in <strong>{status?.expectedEmail ?? "photos@activezoneoutdoor.cy"}</strong>. Transferred files move to the Drive trash
         {status?.logSheetUrl ? <> and are recorded in the <a href={status.logSheetUrl} target="_blank" rel="noreferrer">transfer log</a></> : null}.
       </p>
@@ -147,7 +167,7 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
       {status && !status.connected && (
         <div className="public-gallery-note">
           <span className="gallery-dot warn"></span>
-          <div><p className="eyebrow">GOOGLE PHOTOS</p><strong>Connect {status.expectedEmail}</strong><p>Sign in once as the photos account so AZO Studio can read the Drive folder and publish albums.</p></div>
+          <div><p className="eyebrow">GOOGLE PHOTOS</p><strong>Connect {status.expectedEmail}</strong><p>One-time setup: someone who can sign in as {status.expectedEmail} (for example a Workspace admin) clicks Connect and approves access. After that every operator can publish without the photos account password.</p></div>
           <button className="primary-button" onClick={connect}>Connect</button>
         </div>
       )}
@@ -158,6 +178,15 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
             <span><span className="gallery-dot"></span> Publishing as <strong>{status.accountEmail}</strong> · <button className="link-button" onClick={connect}>Reconnect</button></span>
             {status.lastJob && <span>Last transfer: <strong>{status.lastJob.album_title}</strong> · {formatDate(status.lastJob.finished_at ?? status.lastJob.started_at)} · {status.lastJob.items_done} item(s)</span>}
           </div>
+
+          {years && (years.length ? (
+            <div className="year-chips" role="group" aria-label="Year">
+              {years.map((y) => (
+                <button key={y.id} className={y.id === yearId ? "year-chip active" : "year-chip"} aria-pressed={y.id === yearId}
+                  disabled={busy || loading} onClick={() => chooseYear(y.id)}>{y.name}</button>
+              ))}
+            </div>
+          ) : <p className="board-empty">No year folders (like “2026”) found in the shared Drive folder yet.</p>)}
 
           <div className="tabs" role="tablist">
             {tabs.map((t) => (

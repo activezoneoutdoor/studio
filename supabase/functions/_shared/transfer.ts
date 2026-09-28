@@ -3,7 +3,7 @@ import { adminClient } from "./db.ts";
 import { downloadRange, getFolder, listMedia, renameFolder, trashFile, type DriveFolder } from "./drive.ts";
 import { HttpError } from "./http.ts";
 import * as photos from "./photos.ts";
-import { isDuplicate, nextChunk, validateFolderName, type LedgerEntry } from "./rules.ts";
+import { isDuplicate, isYearFolderName, nextChunk, validateFolderName, type LedgerEntry } from "./rules.ts";
 import { appendItemRow, type JobSummary, writeSummary } from "./sheets.ts";
 import type { Operator } from "./auth.ts";
 
@@ -47,11 +47,28 @@ function one<T>(result: { data: T | null; error: unknown }): T {
   return data;
 }
 
-/** Only direct sub-folders of the configured Drive root can be touched. */
-export async function requireManagedFolder(folderId: unknown): Promise<DriveFolder> {
+function requireFolderId(folderId: unknown): string {
   if (typeof folderId !== "string" || !/^[\w-]{10,}$/.test(folderId)) throw new HttpError(400, "Unknown folder.");
-  const folder = await getFolder(folderId);
-  if (!folder.parents?.includes(config.driveRootFolderId)) throw new HttpError(403, "That folder is not managed by AZO Studio.");
+  return folderId;
+}
+
+/** A year folder (e.g. "2026") directly under the configured Drive root. */
+export async function requireYearFolder(folderId: unknown): Promise<DriveFolder> {
+  const folder = await getFolder(requireFolderId(folderId));
+  if (!folder.parents?.includes(config.driveRootFolderId) || !isYearFolderName(folder.name)) {
+    throw new HttpError(403, "That folder is not a year folder managed by AZO Studio.");
+  }
+  return folder;
+}
+
+/** Only activity folders inside a year folder can be renamed or transferred. */
+export async function requireManagedFolder(folderId: unknown): Promise<DriveFolder> {
+  const folder = await getFolder(requireFolderId(folderId));
+  const parentId = folder.parents?.[0];
+  if (!parentId) throw new HttpError(403, "That folder is not managed by AZO Studio.");
+  await requireYearFolder(parentId).catch(() => {
+    throw new HttpError(403, "That folder is not managed by AZO Studio.");
+  });
   return folder;
 }
 

@@ -1,5 +1,7 @@
 import { assertEquals, assertThrows } from "jsr:@std/assert@1";
-import { classifyFolder, isDuplicate, isMediaMime, isOperatorEmail, nextChunk, validateFolderName } from "./rules.ts";
+import {
+  classifyFolder, isDuplicate, isMediaMime, isOperatorEmail, isYearFolderName, nextChunk, sortYearFolders, validateFolderName,
+} from "./rules.ts";
 
 Deno.test("operator emails are limited to the workspace domain", () => {
   assertEquals(isOperatorEmail("Anna@ActiveZoneOutdoor.cy"), true);
@@ -45,4 +47,13 @@ Deno.test("duplicates by Drive id or checksum", () => {
   assertEquals(isDuplicate(file, [{ driveFileId: "b", md5: "m1" }]), true);
   assertEquals(isDuplicate(file, [{ driveFileId: "b", md5: "m2" }]), false);
   assertEquals(isDuplicate({ ...file, md5: undefined }, [{ driveFileId: "b", md5: null }]), false);
+});
+
+Deno.test("year folders are detected and sorted newest first", () => {
+  assertEquals(isYearFolderName("2026"), true);
+  assertEquals(isYearFolderName(" 2025 "), true);
+  assertEquals(isYearFolderName("Archive"), false);
+  assertEquals(isYearFolderName("2026 trips"), false);
+  const sorted = sortYearFolders([{ name: "2024" }, { name: "Misc" }, { name: "2026" }, { name: "2025" }]);
+  assertEquals(sorted.map((f) => f.name), ["2026", "2025", "2024"]);
 });

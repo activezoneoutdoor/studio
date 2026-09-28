@@ -1,6 +1,6 @@
 # AZO Studio | Active Zone Outdoor
 
-AZO Studio publishes activity folders from Google Drive as Google Photos albums. Operators sign in with an `@activezoneoutdoor.cy` Google Workspace account and see every sub-folder of the shared Drive folder in one of three lists:
+AZO Studio publishes activity folders from Google Drive as Google Photos albums. Operators sign in with an `@activezoneoutdoor.cy` Google Workspace account and choose a year. The shared Drive folder holds year folders (`2026`, `2025`, …), and each year folder holds one folder per activity. The app shows the activity folders of the selected year in one of three lists:
 
 - **Pending**: the folder has photos or videos waiting to be published.
 - **Upcoming**: a new activity folder with no media and no album yet.
@@ -62,6 +62,8 @@ Optional secrets:
 3. Look for boot errors under **Dashboard → Edge Functions → studio-api → Logs**.
 
 ### Connect the photos account (once)
+
+Google Photos does not support service accounts or domain-wide delegation, so the photos account must approve access once. Operators and developers do not need the photos@ password. Only the person doing this one-time step does, for example a Workspace admin, who can also reset the photos@ password.
 
 Sign in to AZO Studio and click **Connect**. On the Google screen, choose `photos@activezoneoutdoor.cy` and allow every permission. The callback only accepts that account. Its refresh token is stored in the `google_connection` table, which only the service role can read. Use **Reconnect** if access is ever revoked.
 

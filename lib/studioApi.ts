@@ -18,6 +18,11 @@ export interface TransferJob {
   finished_at: string | null;
 }
 
+export interface YearFolder {
+  id: string;
+  name: string;
+}
+
 export interface Folder {
   id: string;
   name: string;
@@ -71,7 +76,8 @@ async function call<T>(supabase: SupabaseClient, body: Record<string, unknown>):
 export const studioApi = {
   status: (s: SupabaseClient) => call<StudioStatus>(s, { action: "status" }),
   connectUrl: (s: SupabaseClient) => call<{ url: string }>(s, { action: "connect-url" }),
-  folders: (s: SupabaseClient) => call<{ folders: Folder[] }>(s, { action: "folders" }),
+  years: (s: SupabaseClient) => call<{ years: YearFolder[] }>(s, { action: "years" }),
+  folders: (s: SupabaseClient, yearId: string) => call<{ folders: Folder[] }>(s, { action: "folders", yearId }),
   rename: (s: SupabaseClient, folderId: string, name: string) => call<{ name: string }>(s, { action: "rename", folderId, name }),
   startTransfer: (s: SupabaseClient, folderId: string, title: string) =>
     call<{ job: TransferJob }>(s, { action: "transfer-start", folderId, title }),

@@ -17,6 +17,16 @@ export function isMediaMime(mimeType: string): boolean {
   return type.startsWith("image/") && !unsupportedImageTypes.has(type);
 }
 
+/** Year folders (e.g. "2026") directly under the Drive root hold the activity folders. */
+export function isYearFolderName(name: string): boolean {
+  return /^\d{4}$/.test(name.trim());
+}
+
+/** Year folders, newest first. */
+export function sortYearFolders<T extends { name: string }>(folders: T[]): T[] {
+  return folders.filter((f) => isYearFolderName(f.name)).sort((a, b) => b.name.trim().localeCompare(a.name.trim()));
+}
+
 /**
  * upcoming: nothing uploaded yet and no album — a new activity waiting for photos.
  * pending:  media waiting to be transferred (album may or may not exist yet).
