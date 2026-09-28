@@ -27,7 +27,7 @@ Activity folders are named `<date> <Name>`:
 
 - The date is `YYYYMMDD`, `YYYYMMDD-DD`, `YYYYMMDD-MMDD` or `YYYYMMDD-YYYYMMDD`. It must be a real date and fall in the year folder's year.
 - The date is followed by a single space, never `-`.
-- The name is CamelCase words: each starts with a capital letter and contains only letters and digits. After the first word, `the`, `in`, `at`, `of`, `n` and `&` are also allowed. Inside the name, `-` may join words (e.g. `Rock-n-Roll`), but it must never come right after the date.
+- The name is CamelCase words: each starts with a capital letter and contains only letters and digits. After the first word, `the`, `in`, `at`, `of`, `for`, `and`, `n` and `&` are also allowed. Inside the name, `-` may join words (e.g. `Rock-n-Roll`), but it must never come right after the date.
 
 Examples: `20260315 Troodos Hike`, `20260315-16 Troodos Hike`, `20261230-20270102 NewYear Trip`.
 
