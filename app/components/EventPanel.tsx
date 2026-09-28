@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { clearEventCover, eventCoverUrl } from "@/lib/covers";
 import {
-  callFunction, driveFolderUrl, driveThumbnail, eventPageUrl, formatEventDate, isVideo, uploadLinkUrl,
+  callFunction, coverMediaJoin, driveFolderUrl, driveThumbnail, eventPageUrl, formatEventDate, isVideo, uploadLinkUrl,
   type AzoEvent, type Media, type MediaStatus,
 } from "@/lib/events";
 
@@ -54,7 +55,7 @@ export function EventPanel({ supabase, event, onEdit, onChanged }: Props) {
   }
 
   const refreshEvent = async () => {
-    const { data } = await supabase.from("events").select("*").eq("id", event.id).single();
+    const { data } = await supabase.from("events").select(`*, ${coverMediaJoin}`).eq("id", event.id).single();
     if (data) onChanged(data as AzoEvent);
   };
 
@@ -68,9 +69,9 @@ export function EventPanel({ supabase, event, onEdit, onChanged }: Props) {
     if (event.album_status === "published") await syncPublishedAlbum();
   });
 
+  // Using an album photo replaces any uploaded event photo.
   const setCover = (id: string) => run("cover", async () => {
-    const { error } = await supabase.from("events").update({ cover_media_id: id }).eq("id", event.id);
-    if (error) throw error;
+    await clearEventCover(supabase, event, id);
     await refreshEvent();
   });
 
@@ -109,8 +110,13 @@ export function EventPanel({ supabase, event, onEdit, onChanged }: Props) {
   const visible = filter === "all" ? media : media.filter((m) => m.status === filter);
   const pendingIds = media.filter((m) => m.status === "pending").map((m) => m.id);
 
+  const coverUrl = eventCoverUrl(supabase, event, event.cover?.drive_file_id, 1200);
+
   return (
     <section className="event-panel">
+      {coverUrl
+        ? <img className="panel-cover" src={coverUrl} alt="" referrerPolicy="no-referrer" />
+        : <button className="panel-cover empty" onClick={onEdit}>+ Add an event photo</button>}
       <div className="panel-head">
         <div>
           <p className="eyebrow">{event.activity.toUpperCase()} · {event.status.toUpperCase()}</p>
@@ -176,14 +182,14 @@ export function EventPanel({ supabase, event, onEdit, onChanged }: Props) {
               <a href={`https://drive.google.com/file/d/${item.drive_file_id}/view`} target="_blank" rel="noreferrer" className="media-thumb">
                 <img src={driveThumbnail(item.drive_file_id, 480)} alt={item.name} loading="lazy" referrerPolicy="no-referrer" />
                 {isVideo(item) && <span className="video-badge">▶ VIDEO</span>}
-                {event.cover_media_id === item.id && <span className="cover-badge">COVER</span>}
+                {event.cover_media_id === item.id && <span className="cover-badge">EVENT PHOTO</span>}
               </a>
               <figcaption>
                 <span className="media-name" title={item.name}>{item.uploader_name ?? "Anonymous"}</span>
                 <span className="media-actions">
                   {item.status !== "approved" && <button disabled={!!busy} onClick={() => setStatus([item.id], "approved")}>Approve</button>}
                   {item.status !== "hidden" && <button disabled={!!busy} onClick={() => setStatus([item.id], "hidden")}>Hide</button>}
-                  {item.status === "approved" && !isVideo(item) && event.cover_media_id !== item.id && <button disabled={!!busy} onClick={() => setCover(item.id)}>Cover</button>}
+                  {item.status === "approved" && !isVideo(item) && event.cover_media_id !== item.id && <button disabled={!!busy} onClick={() => setCover(item.id)} title="Use as event photo">Event photo</button>}
                 </span>
               </figcaption>
             </figure>

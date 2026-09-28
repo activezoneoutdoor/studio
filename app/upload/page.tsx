@@ -48,18 +48,22 @@ export default function UploadPage() {
     try { localStorage.setItem("azo-uploader-name", name.trim()); } catch { /* storage unavailable */ }
     setRunning(true);
     const queue = items.filter((i) => i.state === "queued" || i.state === "error");
-    const worker = async () => {
-      for (let item = queue.shift(); item; item = queue.shift()) {
-        const id = item.id;
-        update(id, { state: "uploading", progress: 0, error: undefined });
-        try {
-          await uploadToEvent(supabase, token, item.file, name.trim(), (progress) => update(id, { progress }));
-          update(id, { state: "done", progress: 1 });
-        } catch (error) {
-          update(id, { state: "error", error: error instanceof Error ? error.message : "Upload failed" });
-        }
+    const upload = async (item: Item) => {
+      update(item.id, { state: "uploading", progress: 0, error: undefined });
+      try {
+        await uploadToEvent(supabase, token, item.file, name.trim(), (progress) => update(item.id, { progress }));
+        update(item.id, { state: "done", progress: 1 });
+      } catch (error) {
+        update(item.id, { state: "error", error: error instanceof Error ? error.message : "Upload failed" });
       }
     };
+    const worker = async () => {
+      for (let item = queue.shift(); item; item = queue.shift()) await upload(item);
+    };
+
+    // The first upload creates the event's Drive folder, so it runs alone before the parallel ones.
+    const first = queue.shift();
+    if (first) await upload(first);
     await Promise.all(Array.from({ length: PARALLEL_UPLOADS }, worker));
     setRunning(false);
   }

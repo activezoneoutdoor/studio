@@ -64,23 +64,43 @@ async function drive(path: string, init: RequestInit = {}, params: Record<string
   return res;
 }
 
-async function findOrCreateFolder(name: string, parentId: string): Promise<string> {
+async function listFolders(name: string, parentId: string): Promise<string[]> {
   const escaped = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   const list = await drive("/files", {}, {
     q: `name = '${escaped}' and '${parentId}' in parents and mimeType = '${FOLDER_MIME}' and trashed = false`,
     corpora: "drive",
     driveId: sharedDriveId(),
     includeItemsFromAllDrives: "true",
+    orderBy: "createdTime",
     fields: "files(id)",
   });
-  const existing = (await list.json()).files?.[0]?.id as string | undefined;
+  return ((await list.json()).files ?? []).map((file: { id: string }) => file.id);
+}
+
+async function trash(fileId: string): Promise<void> {
+  await drive(`/files/${encodeURIComponent(fileId)}`, { method: "PATCH", body: JSON.stringify({ trashed: true }) }, { fields: "id" });
+}
+
+/**
+ * Returns the folder with this name in the parent, creating it if missing. Uploads can start at the same moment,
+ * so after creating, the oldest same-named folder wins and any extra one we made is trashed.
+ */
+export async function findOrCreateFolder(name: string, parentId: string): Promise<string> {
+  const [existing] = await listFolders(name, parentId);
   if (existing) return existing;
 
   const created = await drive("/files", {
     method: "POST",
     body: JSON.stringify({ name, mimeType: FOLDER_MIME, parents: [parentId] }),
   }, { fields: "id" });
-  return (await created.json()).id;
+  const createdId: string = (await created.json()).id;
+
+  const [oldest] = await listFolders(name, parentId);
+  if (oldest && oldest !== createdId) {
+    await trash(createdId);
+    return oldest;
+  }
+  return createdId;
 }
 
 function folderPart(value: string): string {
@@ -115,9 +135,10 @@ export async function ensureEventFolder(event: EventRow): Promise<string> {
   if (error) throw error;
   if (data) return folderId;
 
-  // Another upload created the folder at the same moment; use theirs.
+  // Another upload stored its folder first; use that one and trash ours if it differs.
   const { data: current, error: readError } = await admin().from("events").select("drive_folder_id").eq("id", event.id).single();
   if (readError) throw readError;
+  if (current.drive_folder_id !== folderId) await trash(folderId);
   return current.drive_folder_id;
 }
 

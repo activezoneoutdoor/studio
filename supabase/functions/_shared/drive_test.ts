@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { accessToken, eventFolderName } from "./drive.ts";
+import { accessToken, eventFolderName, findOrCreateFolder } from "./drive.ts";
 
 Deno.test("event folder uses the Cyprus date, activity and location", () => {
   assertEquals(
@@ -37,4 +37,36 @@ Deno.test("access token comes from the stored refresh token and is cached", asyn
   assertEquals(requests[0].get("grant_type"), "refresh_token");
   assertEquals(requests[0].get("client_id"), "client-id");
   assertEquals(requests[0].get("refresh_token"), "refresh-token");
+});
+
+Deno.test("a folder created at the same moment as another is trashed in favour of the oldest", async () => {
+  Deno.env.set("AZO_SHARED_DRIVE_ID", "shared-drive");
+  Deno.env.set("GOOGLE_OAUTH_CLIENT_ID", "client-id");
+  Deno.env.set("GOOGLE_OAUTH_CLIENT_SECRET", "client-secret");
+  Deno.env.set("GOOGLE_OAUTH_REFRESH_TOKEN", "refresh-token");
+
+  const realFetch = globalThis.fetch;
+  const calls: string[] = [];
+  let lists = 0;
+  globalThis.fetch = (input, init) => {
+    const url = new URL(String(input));
+    const method = init?.method ?? "GET";
+    calls.push(`${method} ${url.pathname}${method === "PATCH" ? ` ${init?.body}` : ""}`);
+    if (url.hostname === "oauth2.googleapis.com") return Promise.resolve(Response.json({ access_token: "a", expires_in: 3600 }));
+    if (method === "POST") return Promise.resolve(Response.json({ id: "ours" }));
+    if (method === "PATCH") return Promise.resolve(Response.json({ id: "ours" }));
+    // First lookup finds nothing; after creating, another request's folder turns out to be older.
+    return Promise.resolve(Response.json({ files: lists++ === 0 ? [] : [{ id: "theirs" }, { id: "ours" }] }));
+  };
+  try {
+    assertEquals(await findOrCreateFolder("2026-09-27_SUP_Ayia-Napa", "year-folder"), "theirs");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  assertEquals(calls.filter((c) => !c.includes("/token")), [
+    "GET /drive/v3/files",
+    "POST /drive/v3/files",
+    "GET /drive/v3/files",
+    'PATCH /drive/v3/files/ours {"trashed":true}',
+  ]);
 });

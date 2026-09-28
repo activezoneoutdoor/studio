@@ -22,6 +22,7 @@ Everything runs on free tiers: the static site on GitHub Pages, data and sign-in
 
 5. Run `supabase/migrations/20260927000000_restrict_workspace_signups.sql` in the Supabase SQL Editor. Then enable **Authentication → Hooks → Before User Created** and select `public.enforce_azo_workspace_signup`. This hook rejects account creation unless the account is a Google identity with the approved domain.
 6. Run `supabase/migrations/20260928000000_events_albums.sql` in the SQL Editor (or `supabase db push`). It creates `events`, `event_upload_links` and `media` with Row Level Security. Staff accounts can manage everything. The public can read only published events and the approved media of published albums. Upload tokens are never readable by the public.
+7. Run `supabase/migrations/20260929000000_event_cover_images.sql`. It adds event photos: a public Storage bucket `event-covers` that only staff can write to. Staff pick the photo in the event form; it is resized in the browser to at most 1920px (typically 200–500 KB). Alternatively, an approved album photo can be used as the event photo. Whichever was chosen last is shown.
 
 ## Google Drive setup (album storage)
 

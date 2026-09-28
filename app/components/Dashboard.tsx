@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatEventDate, type AzoEvent } from "@/lib/events";
+import { eventCoverUrl } from "@/lib/covers";
+import { coverMediaJoin, formatEventDate, type AzoEvent } from "@/lib/events";
 import { EventForm } from "./EventForm";
 import { EventPanel } from "./EventPanel";
 
@@ -18,7 +19,7 @@ export function Dashboard({ supabase }: { supabase: SupabaseClient }) {
 
   const load = useCallback(async () => {
     const [eventResult, mediaResult] = await Promise.all([
-      supabase.from("events").select("*").order("starts_at", { ascending: false }),
+      supabase.from("events").select(`*, ${coverMediaJoin}`).order("starts_at", { ascending: false }),
       supabase.from("media").select("event_id").eq("status", "pending"),
     ]);
     if (eventResult.error) {
@@ -62,12 +63,15 @@ export function Dashboard({ supabase }: { supabase: SupabaseClient }) {
           {list.length === 0 && <p className="empty-state">{tab === "upcoming" ? "No upcoming events. Create one to get an upload link." : "No past events yet."}</p>}
           {list.map((e) => (
             <button key={e.id} className={`event-row${e.id === selectedId ? " selected" : ""}`} onClick={() => { setSelectedId(e.id); setMode({ kind: "view" }); }}>
-              <span className="event-row-top"><b>{e.title}</b>{pending[e.id] ? <span className="pill attention">{pending[e.id]} to review</span> : null}</span>
-              <span className="event-meta">{formatEventDate(e)} · {e.location_name}</span>
-              <span className="event-row-tags">
-                <span className="pill">{e.activity}</span>
-                <span className={`pill status-${e.status}`}>{e.status}</span>
-                {e.album_status === "published" && <span className="pill status-published">album live</span>}
+              <EventThumb url={eventCoverUrl(supabase, e, e.cover?.drive_file_id, 160)} />
+              <span className="event-row-body">
+                <span className="event-row-top"><b>{e.title}</b>{pending[e.id] ? <span className="pill attention">{pending[e.id]} to review</span> : null}</span>
+                <span className="event-meta">{formatEventDate(e)} · {e.location_name}</span>
+                <span className="event-row-tags">
+                  <span className="pill">{e.activity}</span>
+                  <span className={`pill status-${e.status}`}>{e.status}</span>
+                  {e.album_status === "published" && <span className="pill status-published">album live</span>}
+                </span>
               </span>
             </button>
           ))}
@@ -80,7 +84,7 @@ export function Dashboard({ supabase }: { supabase: SupabaseClient }) {
               supabase={supabase}
               event={mode.kind === "edit" ? mode.event : null}
               onCancel={() => setMode({ kind: "view" })}
-              onSaved={(saved) => { replaceEvent(saved); setSelectedId(saved.id); setMode({ kind: "view" }); }}
+              onSaved={(saved, warning) => { replaceEvent(saved); setSelectedId(saved.id); setMode({ kind: "view" }); setError(warning ?? ""); }}
             />
           ) : selected ? (
             <EventPanel
@@ -104,4 +108,8 @@ export function Dashboard({ supabase }: { supabase: SupabaseClient }) {
       </div>
     </section>
   );
+}
+
+function EventThumb({ url }: { url: string | null }) {
+  return <span className="event-thumb">{url && <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" />}</span>;
 }

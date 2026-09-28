@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { activities, slugify, type AzoEvent, type EventStatus } from "@/lib/events";
+import { clearEventCover, eventCoverUrl, resizeImage, uploadEventCover } from "@/lib/covers";
+import { activities, coverMediaJoin, slugify, type AzoEvent, type EventStatus } from "@/lib/events";
 
 type Props = {
   supabase: SupabaseClient;
   event: AzoEvent | null;
-  onSaved: (event: AzoEvent) => void;
+  /** `warning` is set when the event saved but its photo change failed. */
+  onSaved: (event: AzoEvent, warning?: string) => void;
   onCancel: () => void;
 };
 
@@ -40,6 +42,28 @@ export function EventForm({ supabase, event, onSaved, onCancel }: Props) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [photo, setPhoto] = useState<Blob | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [preparingPhoto, setPreparingPhoto] = useState(false);
+
+  const photoUrl = useMemo(() => photo ? URL.createObjectURL(photo) : null, [photo]);
+  useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl); }, [photoUrl]);
+  const currentCover = event && !removePhoto ? eventCoverUrl(supabase, event, event.cover?.drive_file_id, 800) : null;
+  const preview = photoUrl ?? currentCover;
+
+  async function choosePhoto(file: File | undefined) {
+    if (!file) return;
+    setError("");
+    setPreparingPhoto(true);
+    try {
+      setPhoto(await resizeImage(file));
+      setRemovePhoto(false);
+    } catch (photoError) {
+      setError(photoError instanceof Error ? photoError.message : String(photoError));
+    } finally {
+      setPreparingPhoto(false);
+    }
+  }
 
   const set = (key: keyof typeof form) => (e: { target: { value: string } }) => setForm({ ...form, [key]: e.target.value });
 
@@ -69,18 +93,44 @@ export function EventForm({ supabase, event, onSaved, onCancel }: Props) {
       : supabase.from("events").insert({ ...row, slug: slugify(form.starts_at.slice(0, 10), row.activity, row.location_name) });
     const { data, error: saveError } = await query.select().single();
 
-    setSaving(false);
     if (saveError) {
+      setSaving(false);
       setError(saveError.code === "23505" ? "An event with the same date, activity and location already exists." : saveError.message);
       return;
     }
-    onSaved(data as AzoEvent);
+
+    const saved = data as AzoEvent;
+    let warning: string | undefined;
+    try {
+      if (photo) await uploadEventCover(supabase, saved, photo);
+      else if (removePhoto) await clearEventCover(supabase, saved);
+    } catch (photoError) {
+      warning = `Event saved, but the photo could not be updated: ${photoError instanceof Error ? photoError.message : String(photoError)}. Use Edit details to try again.`;
+    }
+
+    const { data: fresh } = await supabase.from("events").select(`*, ${coverMediaJoin}`).eq("id", saved.id).single();
+    setSaving(false);
+    onSaved((fresh ?? saved) as AzoEvent, warning);
   }
 
   return (
     <form className="event-form" onSubmit={save}>
       <div className="section-heading"><div><p className="eyebrow">{event ? "EDIT EVENT" : "NEW EVENT"}</p><h2>{event ? event.title : "Plan an activity"}</h2></div></div>
       <div className="form-grid">
+        <div className="span-2 photo-field">
+          <div className="photo-preview">{preview ? <img src={preview} alt="" referrerPolicy="no-referrer" /> : <span>{form.activity || "Event"}</span>}</div>
+          <div className="photo-copy">
+            <b>Event photo</b>
+            <p className="form-hint">Shown on the events list and the event page. JPEG or PNG; resized automatically. You can also pick an album photo later.</p>
+            <div className="form-actions">
+              <label className="ghost-button file-button">
+                {preparingPhoto ? "Preparing…" : preview ? "Replace photo" : "Choose photo"}
+                <input type="file" accept="image/jpeg,image/png,image/webp" disabled={preparingPhoto} onChange={(e) => { void choosePhoto(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+              {preview && <button type="button" className="ghost-button" onClick={() => { setPhoto(null); setRemovePhoto(!!currentCover); }}>Remove</button>}
+            </div>
+          </div>
+        </div>
         <label className="span-2">Title<input required maxLength={200} value={form.title} onChange={set("title")} placeholder="Sunrise SUP at Konnos Bay" /></label>
         <label>Activity<input required list="activity-options" value={form.activity} onChange={set("activity")} placeholder="SUP" /></label>
         <datalist id="activity-options">{activities.map((a) => <option key={a} value={a} />)}</datalist>
@@ -99,7 +149,7 @@ export function EventForm({ supabase, event, onSaved, onCancel }: Props) {
       {!event && <p className="form-hint">The album folder is named automatically, e.g. <code>2026-09-27_SUP_Ayia-Napa</code>.</p>}
       {error && <p className="auth-notice" role="alert">{error}</p>}
       <div className="form-actions">
-        <button type="submit" className="primary-button" disabled={saving}>{saving ? "Saving…" : event ? "Save changes" : "Create event"}</button>
+        <button type="submit" className="primary-button" disabled={saving || preparingPhoto}>{saving ? "Saving…" : event ? "Save changes" : "Create event"}</button>
         <button type="button" className="ghost-button" onClick={onCancel}>Cancel</button>
       </div>
     </form>

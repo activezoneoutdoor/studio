@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
-import { driveThumbnail, formatEventDate, isVideo, publicEventColumns, type AzoEvent, type Media } from "@/lib/events";
+import { eventCoverUrl } from "@/lib/covers";
+import { coverMediaJoin, driveThumbnail, formatEventDate, isVideo, publicEventColumns, type AzoEvent, type Media } from "@/lib/events";
 import { PublicShell } from "../components/Shell";
 import { Lightbox } from "../components/Lightbox";
 
@@ -17,9 +18,9 @@ export default function EventPage() {
     if (!supabase || !slug) return setEvent(null);
 
     void (async () => {
-      const { data } = await supabase.from("events").select(publicEventColumns)
+      const { data } = await supabase.from("events").select(`${publicEventColumns}, ${coverMediaJoin}`)
         .eq("slug", slug).in("status", ["published", "cancelled"]).maybeSingle();
-      const found = data as AzoEvent | null;
+      const found = data as unknown as AzoEvent | null;
       setEvent(found);
       if (found) document.title = `${found.title} | Active Zone Outdoor`;
       if (found?.album_status === "published") {
@@ -39,8 +40,11 @@ export default function EventPage() {
     ? `https://www.google.com/maps/search/?api=1&query=${event.lat},${event.lng}`
     : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location_name)}`;
 
+  const coverUrl = supabase ? eventCoverUrl(supabase, event, event.cover?.drive_file_id, 2000) : null;
+
   return (
     <PublicShell>
+      {coverUrl && <img className="event-hero-image" src={coverUrl} alt="" referrerPolicy="no-referrer" />}
       <section className="welcome event-hero">
         <p className="eyebrow">{event.activity.toUpperCase()}{event.status === "cancelled" ? " · CANCELLED" : ""}</p>
         <h1>{event.title}</h1>

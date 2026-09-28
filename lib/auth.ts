@@ -32,7 +32,7 @@ export function useStaffSession() {
       } else {
         setSession(null);
         setNotice(`This studio is limited to @${allowedDomain} accounts.`);
-        window.setTimeout(() => { void supabase.auth.signOut(); }, 0);
+        window.setTimeout(() => { void supabase.auth.signOut({ scope: "local" }); }, 0);
       }
     };
 
@@ -57,9 +57,29 @@ export function useStaffSession() {
     if (error) setNotice(error.message);
   }
 
+  /**
+   * Signs out of this browser. supabase-js keeps the session when its logout request fails,
+   * so on an error or a slow response the stored session is cleared directly.
+   */
   async function signOut() {
-    if (supabase) await supabase.auth.signOut();
+    const timeout = new Promise<{ error: Error }>((resolve) => window.setTimeout(() => resolve({ error: new Error("Sign-out timed out") }), 4000));
+    const result = supabase
+      ? await Promise.race([supabase.auth.signOut({ scope: "local" }), timeout]).catch((error: Error) => ({ error }))
+      : { error: null };
+    if (result.error) clearStoredSession();
+    setSession(null);
+    window.location.replace(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/`);
   }
 
   return { supabase, session, checking, notice, signIn, signOut };
+}
+
+function clearStoredSession() {
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (/^sb-.+-auth-token/.test(key)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage unavailable: there is no stored session to clear.
+  }
 }

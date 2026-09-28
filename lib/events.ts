@@ -23,6 +23,9 @@ export type AzoEvent = {
   album_status: AlbumStatus;
   drive_folder_id: string | null;
   cover_media_id: string | null;
+  cover_image_path: string | null;
+  /** Present when loaded with `coverMediaJoin`. */
+  cover?: { drive_file_id: string } | null;
 };
 
 export type Media = {
@@ -40,8 +43,11 @@ export type Media = {
 
 export const activities = ["Hiking", "SUP", "Kayaking", "Cycling", "Snorkeling", "Climbing", "Camping", "Trail running"];
 
+/** Embeds the album photo chosen as the event photo (events.cover_media_id). */
+export const coverMediaJoin = "cover:media!events_cover_media_fk(drive_file_id)";
+
 export const publicEventColumns =
-  "id, slug, title, activity, starts_at, ends_at, location_name, lat, lng, leader_name, partners, max_participants, description, status, album_status, cover_media_id";
+  "id, slug, title, activity, starts_at, ends_at, location_name, lat, lng, leader_name, partners, max_participants, description, status, album_status, cover_media_id, cover_image_path";
 
 export function driveThumbnail(fileId: string, width = 800): string {
   return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${width}`;
