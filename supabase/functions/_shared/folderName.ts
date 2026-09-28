@@ -3,11 +3,11 @@
 //   <date> <Title>
 //   date:  YYYYMMDD | YYYYMMDD-DD | YYYYMMDD-MMDD | YYYYMMDD-YYYYMMDD
 //   title: CamelCase words separated by single spaces, e.g. "20260315-16 Troodos Hike";
-//          "the", "in", "at", "of", "for", "and", "n" and "&" may appear after the first word, e.g. "20260315 Sunset at the Lake";
+//          "the", "in", "at", "of", "for", "and", "with", "n" and "&" may appear after the first word, e.g. "20260315 Sunset at the Lake";
 //          "-" may join words in the name (e.g. "Rock-n-Roll") but never directly follow the date
 
 // Lowercase connector words allowed between CamelCase words (not as the first word).
-const connectors = new Set(["the", "in", "at", "of", "for", "and", "n", "&"]);
+const connectors = new Set(["the", "in", "at", "of", "for", "and", "with", "n", "&"]);
 
 const datePattern = /^(\d{8})(?:-(\d{2}|\d{4}|\d{8}))?(?=\s|-|$)/;
 
@@ -55,7 +55,7 @@ export function folderNameIssues(rawName: string, year?: string): string[] {
   const badWords = words.filter((w, i) => !/^[\p{Lu}\d][\p{L}\d]*$/u.test(w) && !(i > 0 && connectors.has(w)));
   if (badWords.length) {
     issues.push(
-      `Write words in CamelCase (capital first letter, letters and digits only; “the”, “in”, “at”, “of”, “for”, “and”, “n” and “&” are allowed after the first word): ${
+      `Write words in CamelCase (capital first letter, letters and digits only; “the”, “in”, “at”, “of”, “for”, “and”, “with”, “n” and “&” are allowed after the first word): ${
         badWords.map((w) => `“${w}”`).join(", ")
       }.`,
     );

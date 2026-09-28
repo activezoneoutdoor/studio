@@ -15,6 +15,7 @@ Deno.test("accepts every date form", () => {
     "20260315 Heart of Troodos",
     "20260315 Kayak and Snorkel",
     "20260315 Hike for Charity",
+    "20260315 Kayak with Dolphins",
     "20260315 Rock n Roll Climb",
     "20260315 Rock-n-Roll Climb",
     "20260315 Paphos-Limassol Ride",
@@ -33,7 +34,7 @@ Deno.test("flags names that break the convention", () => {
   has("20260315 troodos hike", "CamelCase");
   has("20260315 the Lake", "CamelCase");
   has("20260315 Sunset on the Lake", "“on”");
-  has("20260315 Kayak with Snorkel", "“with”");
+  has("20260315 Kayak on Snorkel", "“on”");
   has("20260315  Troodos", "single spaces");
   has("20260231 Troodos", "not a real date");
   has("20260315-14 Troodos", "before the start");
