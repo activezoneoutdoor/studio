@@ -31,7 +31,7 @@ Activity folders are named `<date> <Name>`:
 
 Examples: `20260315 Troodos Hike`, `20260315-16 Troodos Hike`, `20261230-20270102 NewYear Trip`.
 
-Folders that break these rules are flagged with **Check name** and the list of problems. The flag is only a warning and does not block a transfer. **Edit name** shows live feedback while the operator types.
+Folders that break these rules are flagged with **Check name** and the list of problems. **A new transfer is blocked until the name is fixed**; the server enforces this too. A transfer that is already running can still be resumed. **Edit name** shows live feedback while the operator types.
 
 ### Who can run transfers
 

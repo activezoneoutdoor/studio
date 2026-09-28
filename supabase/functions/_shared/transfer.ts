@@ -3,6 +3,7 @@ import { adminClient } from "./db.ts";
 import { downloadRange, getFolder, listMedia, renameFolder, trashFile, type DriveFolder } from "./drive.ts";
 import { HttpError } from "./http.ts";
 import * as photos from "./photos.ts";
+import { folderNameIssues } from "./folderName.ts";
 import { isDuplicate, isYearFolderName, nextChunk, validateFolderName, type LedgerEntry } from "./rules.ts";
 import { appendItemRow, type JobSummary, writeSummary } from "./sheets.ts";
 import type { Operator } from "./auth.ts";
@@ -62,14 +63,14 @@ export async function requireYearFolder(folderId: unknown): Promise<DriveFolder>
 }
 
 /** Only activity folders inside a year folder can be renamed or transferred. */
-export async function requireManagedFolder(folderId: unknown): Promise<DriveFolder> {
+export async function requireManagedFolder(folderId: unknown): Promise<DriveFolder & { year: string }> {
   const folder = await getFolder(requireFolderId(folderId));
   const parentId = folder.parents?.[0];
   if (!parentId) throw new HttpError(403, "That folder is not managed by AZO Studio.");
-  await requireYearFolder(parentId).catch(() => {
+  const year = await requireYearFolder(parentId).catch(() => {
     throw new HttpError(403, "That folder is not managed by AZO Studio.");
   });
-  return folder;
+  return { ...folder, year: year.name.trim() };
 }
 
 export async function renameManagedFolder(folderId: unknown, rawName: unknown): Promise<string> {
@@ -134,6 +135,10 @@ export async function startTransfer(operator: Operator, folderId: unknown, rawTi
   if (existing) return existing;
 
   const title = rawTitle === undefined || rawTitle === null ? folder.name : await renameManagedFolder(folder.id, rawTitle);
+  const nameIssues = folderNameIssues(title, folder.year);
+  if (nameIssues.length) {
+    throw new HttpError(400, `Fix the folder name before transferring: ${nameIssues.join(" ")}`);
+  }
   const media = await listMedia(folder.id);
   if (!media.length) throw new HttpError(400, "This folder has no photos or videos to transfer.");
 

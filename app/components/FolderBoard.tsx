@@ -231,6 +231,8 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
                           {folder.nameIssues.length > 0 && <span className="name-flag" title={folder.nameIssues.join("\n")}>Check name</span>}
                         </h3>
                         <NameIssues issues={folder.nameIssues} />
+                        {folder.nameIssues.length > 0 && folder.status === "pending" && status.canTransfer && !folder.runningJob
+                          && <p className="name-block">Transfer is blocked until the name is fixed. Use Edit name.</p>}
                       </>
                     )}
                     <p>
@@ -269,7 +271,9 @@ export default function FolderBoard({ supabase }: { supabase: SupabaseClient }) 
                         )}
                         {folder.status === "pending" && status.canTransfer && (folder.runningJob
                           ? <button className="primary-button" disabled={busy} onClick={() => void runJob(folder.id, folder.runningJob!.id)}>Resume</button>
-                          : <button className="primary-button" disabled={busy} onClick={() => setConfirming(folder.id)}>Transfer</button>)}
+                          : <button className="primary-button" disabled={busy || folder.nameIssues.length > 0}
+                              title={folder.nameIssues.length ? "Fix the folder name first" : undefined}
+                              onClick={() => setConfirming(folder.id)}>Transfer</button>)}
                       </>
                     )}
                   </div>
